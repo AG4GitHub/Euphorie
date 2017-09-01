@@ -94,6 +94,10 @@
       factory=".survey.SearchableTextIndexer"
       name="SearchableText" />
 
+    <adapter
+      factory=".solution.SearchableTextIndexer"
+      name="SearchableText" />
+
     <include package=".behaviour" />
 
     <genericsetup:registerProfile

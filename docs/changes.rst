@@ -1,11 +1,22 @@
 Changelog
 =========
 
-9.0.22 (unreleased)
+9.0.23 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Improve Excel report fix from 9.0.22: Don't write empty line when an
+  entry is skipped
+- Actually consider the allow_guest_accounts setting from the app-
+  config. Don't allow guest login if it is not enabled.
+- Translation fixes in Croatian
 
+
+9.0.22 (2017-08-21)
+-------------------
+
+- CMS: Index more fields of Modules and Measures
+- In the "Excel" report: don't consider risks that were answered as
+  not applicable
 
 9.0.21 (2017-07-18)
 -------------------
