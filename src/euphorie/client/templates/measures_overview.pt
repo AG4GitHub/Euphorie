@@ -14,27 +14,8 @@
 
 <metal:js fill-slot="javascript_head_slot">
    <style type="text/css">
-.prio-high .risk-title, .prio-high td.month {
-      color: red;
-}
-.prio-medium .risk-title,
-.prio-medium td {
-    color:orange
-}
-.prio-low .risk-title,
-.prio-low td {
-    color:green
-}
-table{border-collapse:collapse}
-table th,table td{border-bottom:1px solid silver;padding:0.5em 0}
-table td{padding-left:0.5em;padding-right:0.5em}
-table thead th{text-align:center}
-table thead th.legend{text-align:right; padding-right:0.5em}
-table tbody th{width:70%; padding: 0.5em}
-table tbody td{vertical-align:middle;text-align:center;font-weight:bold;width:9%;}
-table tbody td.month{font-size:3em;}
-table tbody td:nth-child(even){background-color:#ececec}
-table tbody td.legend{font-size:100%; color: black; background-color:#FFFFFF;}
+
+table tbody td.legend{font-size:100%; color: black;}
 .risk-title{margin-bottom:0;font-weight:bold}
 .description{font-weight:normal;margin-bottom:0}
 
@@ -48,6 +29,47 @@ h1 {line-height:130%;}
 h3.title {margin-bottom:1.2em; font-weight:300}
 h4.subtitle {margin-bottom:0.7em;}
 ul.title {margin-bottom:3em;}
+
+ section.module{margin-bottom:5em}
+ h1{margin-bottom:0.3em}
+ h1+.byline{margin-bottom:4em}
+ .title-line td,.title-line th{padding:2em 0 1em 0}
+ .title-line h3{font-weight:bold;margin-bottom:0;font-size:1.5em}
+ .risk-title{margin-bottom:0;font-weight:bold}article.report .description{font-weight:normal;margin-bottom:0}
+
+
+table {
+    border-collapse: collapse;
+}
+
+ section.module{margin-bottom:5em}
+ h1{margin-bottom:0.3em}
+ h1+.byline{margin-bottom:4em}
+ .title-line td,
+ .title-line th{padding:2em 0 1em 0}
+ .title-line h3{font-weight:bold;margin-bottom:0;font-size:1.5em}
+ .prio-high .risk-title{color:red}
+ .prio-high td:before{background-color:red}
+ .prio-medium .risk-title{color:orange}
+ .prio-medium td:before{background-color:orange}
+ .prio-low .risk-title{color:green}
+ .prio-low td:before{background-color:green}
+ table{border-collapse:collapse}
+ table th,table td{border-bottom:1px solid silver;padding:0.5em 0}
+ table td{padding-left:0.5em;padding-right:0.5em;position:relative}
+ table td.start,table td.ongoing,table td.end,table td.start-end{color:transparent}
+ table td.start:before,table td.ongoing:before,table td.end:before,table td.start-end:before{display:block;position:absolute;content:' ';height:20px;top:50%;transform:translateY(-50%)}
+ table td.ongoing:before{width:100%;left:0;right:0}
+ table td.start:before{width:37px;left:calc(50% - 10px);right:0;border-radius:10px 0 0 10px}
+ table td.end:before{width:37px;left:0;right:calc(50% - 10px);border-radius:0 10px 10px 0}
+ table td.start-end:before{width:20px;left:auto;right:8px;border-radius:50%}
+ table thead th{text-align:center}
+ table tbody td{vertical-align:middle;text-align:center;font-weight:bold;font-size:3em}
+ table tbody .risk-row td:nth-child(even){background-color:#ececec}
+ table tbody td.legend{font-size:100%; color: black; border-bottom:1px solid silver!important;padding:0.5em 0}
+ .risk-title{margin-bottom:0;font-weight:bold}
+ .description{font-weight:normal;margin-bottom:0}
+
     </style>
 </metal:js>
 
@@ -91,7 +113,7 @@ ul.title {margin-bottom:3em;}
                                 ${month}
                             </td>
                         </tr>
-                        <tr tal:repeat="risk module/risks/high">
+                        <tr tal:repeat="risk module/risks/high" class="risk-row">
                             <metal:macro define-macro="risk-row">
                             <th>
                                 <h4 class="risk-title">
@@ -101,12 +123,11 @@ ul.title {margin-bottom:3em;}
                                     ${risk/description}
                                 </p>
                             </th>
-                            <tal:block tal:repeat="month risk/months">
-                            <td tal:condition="month" class="month">
+                            <tal:block tal:repeat="month risk/classes">
+                            <td class="${month}" tal:condition="month">
                                 •
                             </td>
-                            <td tal:condition="not:month" class="month">
-
+                            <td tal:condition="not:month">
                             </td>
                             </tal:block>
                             </metal:macro>
@@ -123,7 +144,7 @@ ul.title {margin-bottom:3em;}
                                 ${month}
                             </td>
                         </tr>
-                        <tr tal:repeat="risk module/risks/medium">
+                        <tr tal:repeat="risk module/risks/medium" class="risk-row">
                             <metal:macro use-macro="view/risk-row" />
                         </tr>
                     </tbody>
@@ -138,7 +159,7 @@ ul.title {margin-bottom:3em;}
                                 ${month}
                             </td>
                         </tr>
-                        <tr tal:repeat="risk module/risks/low">
+                        <tr tal:repeat="risk module/risks/low" class="risk-row">
                             <metal:macro use-macro="view/risk-row" />
                         </tr>
                     </tbody>

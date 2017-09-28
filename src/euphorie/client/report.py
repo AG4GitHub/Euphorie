@@ -12,6 +12,7 @@ from AccessControl import getSecurityManager
 from Acquisition import aq_inner
 from collections import defaultdict
 from cStringIO import StringIO
+from datetime import date
 from datetime import datetime
 from euphorie.client import config
 from euphorie.client import model
@@ -1159,11 +1160,11 @@ class MeasuresOverview(survey.Status):
         lang = getattr(self.request, 'LANGUAGE', 'en')
         if "-" in lang:
             lang = lang.split("-")[0]
-        now = datetime.now()
-        next_month = datetime(now.year, (now.month + 1) % 12 or 12, 1)
-        month_after_next = datetime(now.year, (now.month + 2) % 12 or 12, 1)
+        today = date.today()
+        next_month = date(today.year, (today.month + 1) % 12 or 12, 1)
+        month_after_next = date(today.year, (today.month + 2) % 12 or 12, 1)
         self.months = []
-        self.months.append(now.strftime('%b'))
+        self.months.append(today.strftime('%b'))
         self.months.append(next_month.strftime('%b'))
         self.months.append(month_after_next.strftime('%b'))
         self.monthstrings = [
@@ -1200,7 +1201,9 @@ class MeasuresOverview(survey.Status):
                 (t[-1].planning_start is not None and
                     t[-1].planning_start.strftime('%b') in self.months) or
                 (t[-1].planning_end is not None and
-                    t[-1].planning_end.strftime('%b') in self.months)
+                    t[-1].planning_end.strftime('%b') in self.months) or
+                (t[-1].planning_start is not None and t[-1].planning_end is None and
+                    t[-1].planning_start <= today)
             ) and
             (
                 t[-1].responsible is not None or
@@ -1218,6 +1221,30 @@ class MeasuresOverview(survey.Status):
                 title = risk_obj and risk_obj.problem_description or risk.title
             else:
                 title = risk.title
+            classes = []
+            for m in [today, next_month, month_after_next]:
+                cls = None
+                if action.planning_start:
+                    if action.planning_start.month == m.month:
+                        cls = "start"
+                    if action.planning_end:
+                        if action.planning_end.month == m.month:
+                            if (
+                                action.planning_end.month ==
+                                (action.planning_start and action.planning_start.month)
+                            ):
+                                cls = "start-end"
+                            else:
+                                cls = "end"
+                        elif (
+                            action.planning_start.month < m.month and
+                            action.planning_end.month > m.month
+                        ):
+                            cls = "ongoing"
+                    elif action.planning_start.month < m.month:
+                        cls = "ongoing"
+
+                classes.append(cls)
             modulesdict[module][risk.priority].append(
                 {'title': title,
                  'description': action.action_plan,
@@ -1225,7 +1252,8 @@ class MeasuresOverview(survey.Status):
                             action.planning_start.month == m.month) or
                             (action.planning_end and
                             action.planning_end.month == m.month)
-                            for m in [now, next_month, month_after_next]],
+                            for m in [today, next_month, month_after_next]],
+                 'classes': classes,
                  })
 
         # re-use top-level module computation from the Status overview
