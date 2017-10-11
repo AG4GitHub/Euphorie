@@ -159,17 +159,21 @@ table {
                     ${module/number} ${module/name}
                 </h2>
                 <table class="risk-measures-plan" border="1">
-
+                    <thead>
+                        <tr>
+                            <th class="legend"></th>
+                            <th tal:repeat="month view/months" i18n:domain="plone" i18n:translate="">
+                                ${month}
+                            </th>
+                        </tr>
+                    </thead>
                     <tbody class="prio-high" tal:condition="module/risks/high">
                         <tr class="title-line">
-                            <th >
+                            <th colspan="4">
                                 <h3 i18n:translate="heading_high_prio_risks">
                                     High priority risks
                                 </h3>
                             </th>
-                            <td tal:repeat="month view/months" class="legend" i18n:domain="plone" i18n:translate="">
-                                ${month}
-                            </td>
                         </tr>
                         <tr tal:repeat="risk module/risks/high" class="risk-row">
                             <metal:macro define-macro="risk-row">
