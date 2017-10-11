@@ -2903,7 +2903,7 @@ msgstr ""
 
 #. Default: Yes, the remaining risk is acceptable
 #: src/euphorie/client/templates/risk_identification.pt:29
-msgid "label_yes_sufficien"
+msgid "label_yes_sufficient"
 msgstr ""
 
 #. Default: No, more measures are required
