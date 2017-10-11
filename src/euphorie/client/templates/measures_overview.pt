@@ -140,10 +140,10 @@ table {
 
 
         <article class="pat-rich report">
+            <h1>${here/Title}</h1>
             <p class="byline">
                 ${view/date}
             </p>
-            <h1>${here/Title}</h1>
             <h4 class="subtitle">${view/session_title}</h4>
             <h2 class="title"><em i18n:translate="">Overview of measures</em></h2>
             <h3 class="title" i18n:translate="">(measures to be implemented in the coming months)</h3>
