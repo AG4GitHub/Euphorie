@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html
+<html class="report"
     tal:define="
                       client nocall:request/client;
                   base_url client/++resource++euphorie.resources;">
