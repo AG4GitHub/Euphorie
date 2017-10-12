@@ -1,143 +1,204 @@
 <!DOCTYPE html>
 <html class="report"
     tal:define="
-                      client nocall:request/client;
-                  base_url client/++resource++euphorie.resources;">
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>Report | {{ site.title }}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="${base_url}/screen.css" type="text/css" />
-</head>
+        client nocall:request/client;
+        base_url client/++resource++euphorie.resources;
+        is_pdf view/request/called_by|nothing;
+">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>OiRA - <tal:translate i18n:translate="">Overview of measures</tal:translate></title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="${base_url}/screen.css" type="text/css" />
 
 
-<body class="report">
+        <style type="text/css" tal:condition="is_pdf">
+@page {
+    size: A4 portrait;
+    margin:0.5cm 0.5cm 2cm 0.5cm;
 
-   <!-- <style type="text/css">
-
-table tbody td.legend{
-    font-size:100%;
-    color: black;}
-.risk-title{
-    margin-bottom:0;
-    font-weight:bold}
-.description{
-    font-weight:normal;
-    margin-bottom:0}
-
-.module h2{
-    font-size:1.5em;
-    line-height:130%;
-    font-weight:400;
-    margin-bottom:0.2em}
-h2.title {
-    line-height:100%;
-    font-weight:400;
-    margin-bottom:0.3em}
-section.module {
-      margin-bottom: 5em;
-}
-p.byline {float:right;}
-h1 {line-height:130%;}
-h3.title {margin-bottom:1.2em; font-weight:300}
-h4.subtitle {margin-bottom:0.7em;}
-ul.title {margin-bottom:3em;}
-
- section.module{margin-bottom:5em}
- h1{margin-bottom:0.3em}
- h1+.byline{margin-bottom:4em}
- .title-line td,.title-line th{padding:2em 0 1em 0}
- .title-line h3{font-weight:bold;margin-bottom:0;font-size:1.5em}
- .risk-title{margin-bottom:0;font-weight:bold}article.report .description{font-weight:normal;margin-bottom:0}
-
-
-table {
-    border-collapse: collapse;
+    @bottom-right {
+        content: "${view/label_page} " counter(page) " ${view/label_page_of} " counter(pages);
+        font-size: 8pt;
+        font-family: sans-serif;
+    }
+    @bottom-left {
+        font-size: 8pt;
+        content: flow(footer);
+        text-align:left;
+        font-family: sans-serif;
+    }
 }
 
- section.module{
-    margin-bottom:5em}
- h1{
-    margin-bottom:0.3em}
- h1+.byline{
-    margin-bottom:4em}
- .title-line td,
- .title-line th{
-    padding:2em 0 1em 0}
- .title-line h3{
-    font-weight:bold;margin-bottom:0;font-size:1.5em}
- .prio-high .risk-title{
-    color:red}
- .prio-high td:before{
-    background-color:red}
- .prio-medium .risk-title{
-    color:orange}
- .prio-medium td:before{
-    background-color:orange}
- .prio-low .risk-title{
-    color:green}
- .prio-low td:before{
-    background-color:green}
- table{
-    border-collapse:collapse}
- table th,table td{
-    border-bottom:1px solid silver;
-    padding:0.5em 0}
- table td{
-    padding-left:0.5em;
-    padding-right:0.5em;
-    position:relative}
- table td.start,table td.ongoing,table td.end,table td.start-end{
-    color:transparent}
- table td.start:before,
- table td.ongoing:before,
- table td.end:before,
- table td.start-end:before{
+html {
+    height: inherit;
+}
+body, h1, h2, h3, h4, h5, h6, p, blockquote, ul, ol, li, table, tr, th, td, form, fieldset, legend, button, div, object, figure, img {
+    margin: 0;
+    border: 0;
+    padding: 0;
+    list-style: none;
+    text-align: left;
+}
+body {
+    color: #222;
+    font-family: "Roboto Condensed",sans-serif;
+//    font-weight: normal;
+    font-style: normal;
+    line-height: 150%;
+    font-size: 80%;
+    background: #fff;
+    letter-spacing: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    orphans:3;
+    widows:4;
+    border: 0;
+    list-style: none;
+    text-align: left;
+}
+div.print-footer {
+  flow: static(footer);
+}
+.osc-off #main,
+.sidebar-off #content,
+.osc-off.sidebar-off #content {
+    position: inherit;
+    height: inherit;
+}
+#main {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    transition: left 0.5s, filter 2s;
+}
+#content {
+    left: 0;
+    padding: 10% 10% 10% 10%;
+    font-size: 120%;
+    line-height: 1.5em;
+    overflow: auto;
+    top: 3rem;
+    right: 0;
+    bottom: 0;
+    transition: all 0.5s;
+}
+article h1 {
+    font-weight: 600;
+    font-size: 2em;
+    line-height: 130%;
+    margin-bottom: 0.7em;
+}
+a {
+    text-decoration: none;
+    color: #0081be;
+}
+.page-toc ul {
+    padding-left: 1em;
+}
+article h2, .pat-rich h2 {
+    font-size: 1.5em;
+    line-height: 130%;
+    font-weight: 400;
+    margin-bottom: 0.7em;
+}
+h3 {
+    clear: both;
+}
+article h3, .pat-rich h3 {
+    font-size: 1em;
+    font-weight: 400;
+    margin-bottom: 1em;
+}
+article.report .title-line h3 {
+    font-weight: bold;
+    margin-bottom: 0;
+    font-size: 1.5em;
+}
+.twelve, .row .twelve {
+    width: 100%;
+}
+[class*="column"]+[class*="column"]:last-child {
+    float: right;
+}
+.column, .columns {
+    float: left;
+    min-height: 1px;
+    padding: 0 15px;
+    position: relative;
+    box-sizing: border-box;
+}
+
+dl.status dd .high-prio-risks {
+    margin-bottom: 3.5em;
+}
+dl.status dd .high-prio-risks h4 {
+    color: rgba(0,0,0,0.6);
+}
+dl.status dd .high-prio-risks li {
+    margin-left: 0;
+    padding-left: 1em;
+}
+dl.status dd .high-prio-risks li:before {
+    content: "•";
+    float: left;
+    margin-left: -1em;
+}
+dt {
+    page-break-after: avoid;
+}
+dd, .page-toc {
+    page-break-after: always;
+}
+.graph {
+    position: relative;
+}
+
+// p.byline {float:right;}
+
+table td.start:before,
+table td.ongoing:before,
+table td.end:before,
+table td.start-end:before{
     display:block;
     position:absolute;
     content:' ';
     height:20px;
     top:50%;
     transform:translateY(-50%)}
- table td.ongoing:before{
+table td.ongoing:before{
     width:100%;left:0;right:0}
- table td.start:before{
+table td.start:before{
     width:37px;
     left:calc(50% - 10px);
     right:0;
     border-radius:10px 0 0 10px}
- table td.end:before{
+table td.end:before{
     width:37px;
     left:0;
     right:calc(50% - 10px);
     border-radius:0 10px 10px 0}
- table td.start-end:before{
+table td.start-end:before{
     width:20px;
     left:auto;
     right:8px;
     border-radius:50%}
- table thead th{
-    text-align:center}
- table tbody td{
-    vertical-align: middle;
-    text-align: center;
-    font-weight: bold;
-    font-size: 3em}
- table tbody .risk-row td:nth-child(even){
-    background-color:#ececec}
- table tbody td.legend{
-    font-size:100%;
-    color: black;
-    border-color: red;
-    border-bottom: 1px solid silver;
-    padding:0.5em 0}
- .risk-title{margin-bottom:0;font-weight:bold}
- .description{font-weight:normal;margin-bottom:0}
-
-    </style> -->
+article.report table thead tr {
+    border-bottom: none;
+}
+article.report table thead th {
+    border-bottom: none;
+}
 
 
+        </style>
+    </head>
 
+
+    <body class="report">
 
         <article class="pat-rich report">
             <h1>${here/Title}</h1>
@@ -152,7 +213,6 @@ table {
               <li i18n:translate="">Pass information to the people concerned.</li>
               <li i18n:translate="">Monitor the measures to be implemented in the forthcoming 3 months.</li>
             </ul> -->
-
 
             <section class="module" tal:repeat="module view/modules">
                 <h2 class="module-name">
@@ -197,14 +257,11 @@ table {
                     </tbody>
                     <tbody class="prio-medium" tal:condition="module/risks/medium">
                         <tr class="title-line">
-                            <th>
+                            <th colspan="4">
                                 <h3 i18n:translate="heading_medium_prio_risks">
                                     Medium priority risks
                                 </h3>
                             </th>
-                            <td tal:repeat="month view/months" class="legend">
-                                ${month}
-                            </td>
                         </tr>
                         <tr tal:repeat="risk module/risks/medium" class="risk-row">
                             <metal:macro use-macro="view/risk-row" />
@@ -212,14 +269,11 @@ table {
                     </tbody>
                     <tbody class="prio-low" tal:condition="module/risks/low">
                         <tr class="title-line">
-                            <th>
+                            <th colspan="4">
                                 <h3 i18n:translate="heading_low_prio_risks">
                                     Low priority risks
                                 </h3>
                             </th>
-                            <td tal:repeat="month view/months" class="legend">
-                                ${month}
-                            </td>
                         </tr>
                         <tr tal:repeat="risk module/risks/low" class="risk-row">
                             <metal:macro use-macro="view/risk-row" />
