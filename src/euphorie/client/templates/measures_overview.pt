@@ -3,7 +3,7 @@
     tal:define="
         client nocall:request/client;
         base_url client/++resource++euphorie.resources;
-        is_pdf view/request/called_by|nothing;
+        is_pdf python:1;
 ">
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -165,37 +165,37 @@ dd, .page-toc {
 
 // p.byline {float:right;}
 
-table td.start:before,
-table td.ongoing:before,
-table td.end:before,
-table td.start-end:before{
+article.report table td.start:before,
+article.report table td.ongoing:before,
+article.report table td.end:before,
+article.report table td.start-end:before{
     display:block;
     position:absolute;
     content:' ';
     height:20px;
     top:50%;
     transform:translateY(-50%)}
-table td.ongoing:before{
+article.report table td.ongoing:before{
     width:100%;left:0;right:0}
-table td.start:before{
+article.report table td.start:before{
     width:37px;
     left:calc(50% - 10px);
     right:0;
     border-radius:10px 0 0 10px}
-table td.end:before{
+article.report table td.end:before{
     width:37px;
     left:0;
     right:calc(50% - 10px);
     border-radius:0 10px 10px 0}
-table td.start-end:before{
+article.report table td.start-end:before{
     width:20px;
     left:auto;
     right:8px;
     border-radius:50%}
-article.report table thead tr {
+article.report article.report table thead tr {
     border-bottom: none;
 }
-article.report table thead th {
+article.report article.report table thead th {
     border-bottom: none;
 }
 
