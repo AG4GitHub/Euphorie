@@ -322,7 +322,9 @@ class Status(grok.View):
         ):
             self.session_title = session.title
         else:
-            self.session_title = None
+            self.session_title = (
+                callable(getattr(self.context, 'Title', None)) and
+                self.context.Title() or '')
 
     def module_query(self, sessionid, optional_modules):
         if optional_modules:

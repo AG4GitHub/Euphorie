@@ -34,7 +34,6 @@ class PdfView(grok.View):
     def render(self):
         context = self.context
         view_name = self.request.get('view', 'view')
-        self.request['called_by'] = 'pdf'
         view = context.restrictedTraverse(view_name)
         pdf = self.view_to_pdf(view)
 
