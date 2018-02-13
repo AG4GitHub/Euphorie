@@ -401,48 +401,49 @@ class ActionPlanView(grok.View):
         for plan in self.context.action_plans:
             existing_plans[str(plan.id)] = plan
         form = self.request.form
-        form["action_plans"] = []
-        for i in range(0, len(form['measure'])):
-            measure = dict([p for p in form['measure'][i].items()
-                            if p[1].strip()])
-            form['action_plans'].append(measure)
-            if len(measure):
-                budget = measure.get("budget")
-                budget = budget and budget.split(',')[0].split('.')[0]
-                if measure.get('id', '-1') in existing_plans:
-                    plan = existing_plans[measure.get('id')]
-                    if (
-                        measure.get("action_plan") != plan.action_plan or
-                        measure.get("prevention_plan") != plan.prevention_plan or
-                        measure.get("requirements") != plan.requirements or
-                        measure.get("responsible") != plan .responsible or (
-                            plan.budget and (budget != str(plan.budget)) or
-                            plan.budget is None and budget
-                        ) or (
-                            (plan.planning_start and
-                                measure.get('planning_start') != plan.planning_start.strftime('%Y-%m-%d')) or
-                            (plan.planning_start is None and measure.get('planning_start'))
-                        ) or (
-                            (plan.planning_end and
-                                measure.get('planning_end') != plan.planning_end.strftime('%Y-%m-%d')) or
-                            (plan.planning_end is None and measure.get('planning_end'))
-                        )
-                    ):
-                        updated += 1
-                    del existing_plans[measure.get('id')]
-                else:
-                    added += 1
-                new_plans.append(
-                    model.ActionPlan(
-                        action_plan=measure.get("action_plan"),
-                        prevention_plan=measure.get("prevention_plan"),
-                        requirements=measure.get("requirements"),
-                        responsible=measure.get("responsible"),
-                        budget=budget,
-                        planning_start=measure.get('planning_start'),
-                        planning_end=measure.get('planning_end')
+        actions = sorted(
+            [int(i) for i in form.get('action_plan') if '#' not in i]
+        )
+        for i in actions:
+            budget = form.get("budget_{}".format(i))
+            budget = budget and budget.split(',')[0].split('.')[0] or None
+            planning_start = form.get("planning_start_{}".format(i)) or None
+            planning_end = form.get("planning_end_{}".format(i)) or None
+            id = form.get("id_{}".format(i), "-1")
+            if id in existing_plans:
+                plan = existing_plans[id]
+                if (
+                    form.get("action_plan_{}".format(i)) != plan.action_plan or
+                    form.get("prevention_plan_{}".format(i)) != plan.prevention_plan or
+                    form.get("requirements_{}".format(i)) != plan.requirements or
+                    form.get("responsible_{}".format(i)) != plan .responsible or (
+                        plan.budget and (budget != str(plan.budget)) or
+                        plan.budget is None and budget
+                    ) or (
+                        (plan.planning_start and
+                            planning_start != plan.planning_start.strftime('%Y-%m-%d')) or
+                        (plan.planning_start is None and planning_start)
+                    ) or (
+                        (plan.planning_end and
+                            planning_end != plan.planning_end.strftime('%Y-%m-%d')) or
+                        (plan.planning_end is None and planning_end)
                     )
+                ):
+                    updated += 1
+                del existing_plans[id]
+            else:
+                added += 1
+            new_plans.append(
+                model.ActionPlan(
+                    action_plan=form.get("action_plan_{}".format(i)),
+                    prevention_plan=form.get("prevention_plan_{}".format(i)),
+                    requirements=form.get("requirements_{}".format(i)),
+                    responsible=form.get("responsible_{}".format(i)),
+                    budget=budget,
+                    planning_start=planning_start,
+                    planning_end=planning_end
                 )
+            )
         removed = len(existing_plans)
         if added == 0 and updated == 0 and removed == 0:
             IStatusMessage(self.request).add(
