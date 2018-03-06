@@ -1,31 +1,6 @@
 Changelog
 =========
 
-9.0.35 (unreleased)
--------------------
-
-- Nothing changed yet.
-
-
-9.0.34 (2018-02-14)
--------------------
-
-Changed:
-
-- In the Identification Report, handle links and lists that are present in the
-  markup in a better way.
-- In the Status page / Overview of Risks report: Risks answered with "Does not
-  apply" are no longer counted as "no risk" or "not answered", but are not shown
-  in the report at all.
-
-
-9.0.33 (2018-01-17)
--------------------
-
-Changed:
-
-- In the Identification Report (list of all risks), show the Legal References,
-  if present. (TNO only, since this report is customised for EU-OSHA)
 
 9.0.32.1 (2018-03-06)
 ---------------------
