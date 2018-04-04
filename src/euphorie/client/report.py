@@ -1059,7 +1059,7 @@ class ActionPlanReportDownload(grok.View):
         return output.getvalue()
 
 
-class ActionPlanTimeline(grok.View):
+class ActionPlanTimeline(grok.View, survey._StatusHelper):
     """Generate an excel file listing all measures.
 
     This view is registered for :obj:`PathGhost` instead of :obj:`ISurvey`
@@ -1159,22 +1159,28 @@ class ActionPlanTimeline(grok.View):
             sheet.cell(row=0, column=column).value = t(title)
 
         row = 1
-        for (module, risk, measure) in self.get_measures():
 
-            if risk.identification in ["n/a", "yes"]:
+        modules = self.getModules()
+        risks = self.getRisks([m['path'] for m in modules.values()])
+        import pdb; pdb.set_trace( )
+        for risk in risks:
+        # for (module, risk, measure) in self.get_measures():
+            if risk.get('identification') in ["n/a", "yes"]:
                 continue
 
             column = 0
-            if 'custom-risks' in risk.zodb_path:
+            if risk.get('is_custom_risk'):
                 zodb_node = None
             else:
-                zodb_node = survey.restrictedTraverse(risk.zodb_path.split('/'))
+                zodb_node = survey.restrictedTraverse(risk.get('zodb_path').split('/'))
             for (ntype, key, title) in self.columns:
                 value = None
                 if ntype == 'measure':
-                    value = getattr(measure, key, None)
+                    pass
+                    # value = getattr(measure, key, None)
                 elif ntype == 'risk':
-                    value = getattr(risk, key, None)
+                    # value = getattr(risk, key, None)
+                    value = risk.get(key, None)
                     if key == 'priority':
                         value = self.priority_name(value)
                     elif key == 'title':
@@ -1182,10 +1188,11 @@ class ActionPlanTimeline(grok.View):
                                 zodb_node.problem_description.strip():
                             value = zodb_node.problem_description
                 elif ntype == 'module':
-                    if key == 'title' and module.zodb_path == 'custom-risks':
-                        value = utils.get_translated_custom_risks_title(self.request)
-                    else:
-                        value = getattr(module, key, None)
+                    if key == 'title':
+                        if risk.get('is_custom_risk'):
+                            value = utils.get_translated_custom_risks_title(self.request)
+                        else:
+                            value = risk.get('module_title')
                 if value is not None:
                     sheet.cell(row=row, column=column).value = value
                 column += 1

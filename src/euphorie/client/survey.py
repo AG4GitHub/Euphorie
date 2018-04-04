@@ -277,59 +277,7 @@ class ActionPlan(grok.View):
             self.next_url = None
 
 
-class Status(grok.View):
-    """Show survey status information.
-    """
-    grok.context(ISurvey)
-    grok.require("euphorie.client.ViewSurvey")
-    grok.layer(IClientSkinLayer)
-    grok.template("status")
-
-    def __init__(self, context, request):
-        super(Status, self).__init__(context, request)
-        default_risks_by_status = lambda: {
-            'present': {
-                'high': [],
-                'medium': [],
-                'low': [],
-            },
-            'possible': {
-                'postponed': [],
-                'todo': [],
-            },
-        }
-        self.risks_by_status = defaultdict(default_risks_by_status)
-        now = datetime.now()
-        lang = date_lang = getattr(self.request, 'LANGUAGE', 'en')
-        # Special handling for Flemish, for which LANGUAGE is "nl-be". For
-        # translating the date under plone locales, we reduce to generic "nl".
-        # For the specific oira translation, we rewrite to "nl_BE"
-        if "-" in lang:
-            date_lang = lang.split("-")[0]
-            elems = lang.split("-")
-            lang = "{0}_{1}".format(elems[0], elems[1].upper())
-        self.date = u"{0} {1} {2}".format(
-            now.strftime('%d'),
-            translate(
-                PloneLocalesFactory(
-                    "month_{0}".format(now.strftime('%b').lower()),
-                    default=now.strftime('%B'),
-                ),
-                target_language=date_lang,),
-            now.strftime('%Y')
-        )
-        self.label_page = translate(_(u"label_page", default=u"Page"), target_language=lang)
-        self.label_page_of = translate(_(u"label_page_of", default=u"of"), target_language=lang)
-        session = SessionManager.session
-        if (
-            session is not None and session.title != (
-                callable(getattr(self.context, 'Title', None)) and
-                self.context.Title() or ''
-            )
-        ):
-            self.session_title = session.title
-        else:
-            self.session_title = None
+class _StatusHelper(object):
 
     def module_query(self, sessionid, optional_modules):
         if optional_modules:
@@ -517,27 +465,27 @@ class Status(grok.View):
 
         child_node = orm.aliased(model.Risk)
         risks = session.query(
-                    model.Module.path,
-                    child_node.id,
-                    child_node.path,
-                    child_node.title,
-                    child_node.identification,
-                    child_node.priority,
-                    child_node.risk_type,
-                    child_node.zodb_path,
-                    child_node.is_custom_risk,
-                    child_node.postponed
-                ).filter(
-                    sql.and_(
-                        model.Module.session_id == session_id,
-                        model.Module.path.in_(filtered_module_paths),
-                        sql.and_(
-                            child_node.session_id == model.Module.session_id,
-                            child_node.depth > model.Module.depth,
-                            child_node.path.like(model.Module.path + "%")
-                        )
-                    )
+            model.Module,
+            model.Risk
+        ).filter(
+            sql.and_(
+                model.Module.session_id == session_id,
+                model.Module.path.in_(filtered_module_paths),
+                sql.and_(
+                    child_node.session_id == model.Module.session_id,
+                    child_node.depth > model.Module.depth,
+                    child_node.path.like(model.Module.path + "%")
                 )
+            )
+        ).join(
+            (
+                model.Risk,
+                sql.and_(
+                    model.Risk.path.startswith(model.Module.path),
+                    model.Risk.session == self.session
+                )
+            )
+        )
 
         def _module_path(path):
             # Due to the extended query above that replaces top-module paths
@@ -548,27 +496,88 @@ class Status(grok.View):
                 if path.startswith(mp):
                     return mp
         filtered_risks = []
-        for risk in risks:
-            if risk[4] != 'n/a':
+        # import pdb; pdb.set_trace( )
+        for (module, risk) in risks.all():
+            if risk.identification != 'n/a':
+                # import pdb; pdb.set_trace( )
                 filtered_risks.append({
-                    'module_path': _module_path(risk[0]),
-                    'id': risk[1],
-                    'path': risk[2],
-                    'title': risk[3],
-                    'identification': risk[4],
-                    'priority': risk[5],
-                    'risk_type': risk[6],
-                    'zodb_path': risk[7],
-                    'is_custom_risk': risk[8],
-                    'postponed': risk[9],
+                    'module_path': _module_path(module.path),
+                    'module_title': module.title,
+                    'id': risk.id,
+                    'path': risk.path,
+                    'title': risk.title,
+                    'identification': risk.identification,
+                    'priority': risk.priority,
+                    'risk_type': risk.risk_type,
+                    'zodb_path': risk.zodb_path,
+                    'is_custom_risk': risk.is_custom_risk,
+                    'postponed': risk.postponed,
+                    'number': risk.number,
+                    'comment': risk.comment,
                 })
         return filtered_risks
+
+
+class Status(grok.View, _StatusHelper):
+    """Show survey status information.
+    """
+    grok.context(ISurvey)
+    grok.require("euphorie.client.ViewSurvey")
+    grok.layer(IClientSkinLayer)
+    grok.template("status")
+
+    def __init__(self, context, request):
+        super(Status, self).__init__(context, request)
+        default_risks_by_status = lambda: {
+            'present': {
+                'high': [],
+                'medium': [],
+                'low': [],
+            },
+            'possible': {
+                'postponed': [],
+                'todo': [],
+            },
+        }
+        self.risks_by_status = defaultdict(default_risks_by_status)
+        now = datetime.now()
+        lang = date_lang = getattr(self.request, 'LANGUAGE', 'en')
+        # Special handling for Flemish, for which LANGUAGE is "nl-be". For
+        # translating the date under plone locales, we reduce to generic "nl".
+        # For the specific oira translation, we rewrite to "nl_BE"
+        if "-" in lang:
+            date_lang = lang.split("-")[0]
+            elems = lang.split("-")
+            lang = "{0}_{1}".format(elems[0], elems[1].upper())
+        self.date = u"{0} {1} {2}".format(
+            now.strftime('%d'),
+            translate(
+                PloneLocalesFactory(
+                    "month_{0}".format(now.strftime('%b').lower()),
+                    default=now.strftime('%B'),
+                ),
+                target_language=date_lang,),
+            now.strftime('%Y')
+        )
+        self.label_page = translate(_(u"label_page", default=u"Page"), target_language=lang)
+        self.label_page_of = translate(_(u"label_page_of", default=u"of"), target_language=lang)
+        session = SessionManager.session
+        if (
+            session is not None and session.title != (
+                callable(getattr(self.context, 'Title', None)) and
+                self.context.Title() or ''
+            )
+        ):
+            self.session_title = session.title
+        else:
+            self.session_title = None
 
     def getStatus(self):
         """ Gather a list of the modules and locations in this survey as well
             as data around their state of completion.
         """
         session = Session()
+        self.session = SessionManager.session
         total_ok = 0
         total_with_measures = 0
         modules = self.getModules()
