@@ -279,6 +279,16 @@ class ActionPlan(grok.View):
 
 class _StatusHelper(object):
 
+    @property
+    @memoize
+    def sql_session(self):
+        return Session()
+
+    @property
+    @memoize
+    def session_id(self):
+        return SessionManager.id
+
     def module_query(self, sessionid, optional_modules):
         if optional_modules:
             omc = """WHEN profile_index != -1 AND zodb_path IN %(modules)s
@@ -306,20 +316,18 @@ class _StatusHelper(object):
             yield path[:3].lstrip("0")
             path = path[3:]
 
-    def getModules(self):
-        """ Return a list of dicts of all the top-level modules and locations
-            belonging to this survey.
+    def getModulePaths(self):
+        """ Return a list of all the top-level modules belonging to this survey.
         """
-        session = Session()
-        session_id = SessionManager.id
-        base_url = "%s/identification" % self.request.survey.absolute_url()
+        sql_session = self.sql_session
+        session_id = self.session_id
         profile = extractProfile(self.request.survey, SessionManager.session)
         module_query = self.module_query(
             sessionid=session_id,
             optional_modules=len(profile) and "(%s)" % (','.join(
                 ["'%s'" % k for k in profile.keys()])) or None
         )
-        module_res = session.execute(module_query).fetchall()
+        module_res = sql_session.execute(module_query).fetchall()
         modules_and_profiles = {}
         for row in module_res:
             if row[0] is not None:
@@ -329,27 +337,48 @@ class _StatusHelper(object):
                 else:
                     modules_and_profiles[row[0]] = ''
         module_paths = [
-            p[0] for p in session.execute(module_query).fetchall() if
+            p[0] for p in sql_session.execute(module_query).fetchall() if
             p[0] is not None]
         module_paths = modules_and_profiles.keys()
         module_paths = sorted(module_paths)
-        parent_node = orm.aliased(model.Module)
-        titles = dict(session.query(model.Module.path, model.Module.title)
-                .filter(model.Module.session_id == session_id)
-                .filter(model.Module.path.in_(module_paths)))
+        self.modules_and_profiles = modules_and_profiles
+        return module_paths
 
-        location_titles = dict(session.query(
-                    model.Module.path,
-                    parent_node.title
-                ).filter(
-                        model.Module.session_id == session_id).filter(
-                        model.Module.path.in_(module_paths)).filter(
-                        sql.and_(
-                            parent_node.session_id == session_id,
-                            parent_node.depth < model.Module.depth,
-                            model.Module.path.like(parent_node.path + "%")
-                        )
-                ))
+    def getModules(self):
+        """ Return a list of dicts of all the top-level modules and locations
+            belonging to this survey.
+        """
+        sql_session = self.sql_session
+        session_id = self.session_id
+        module_paths = self.getModulePaths()
+        base_url = "%s/identification" % self.request.survey.absolute_url()
+        parent_node = orm.aliased(model.Module)
+        titles = dict(
+            sql_session.query(
+                model.Module.path, model.Module.title
+            ).filter(
+                model.Module.session_id == session_id
+            ).filter(
+                model.Module.path.in_(module_paths)
+            )
+        )
+
+        location_titles = dict(
+            sql_session.query(
+                model.Module.path,
+                parent_node.title
+            ).filter(
+                model.Module.session_id == session_id
+            ).filter(
+                model.Module.path.in_(module_paths)
+            ).filter(
+                sql.and_(
+                    parent_node.session_id == session_id,
+                    parent_node.depth < model.Module.depth,
+                    model.Module.path.like(parent_node.path + "%")
+                )
+            )
+        )
         modules = {}
         toc = {}
         title_custom_risks = utils.get_translated_custom_risks_title(self.request)
@@ -369,7 +398,7 @@ class _StatusHelper(object):
                 }
                 # If this is a profile (aka container for locations), skip
                 # adding to the list of modules
-                if modules_and_profiles[path] == 'profile':
+                if self.modules_and_profiles[path] == 'profile':
                     continue
             # sub-module (location) or location container
             else:
@@ -404,8 +433,8 @@ class _StatusHelper(object):
         """ Return a list of risk dicts for risks that belong to the modules
             with paths as specified in module_paths.
         """
-        session = Session()
-        session_id = SessionManager.id
+        sql_session = self.sql_session
+        session_id = self.session_id
         # First, we need to compute the actual module paths, making sure that
         # skipped optional modules are excluded
         # This means top-level module paths like 001 or 001002 can be replaced
@@ -420,7 +449,7 @@ class _StatusHelper(object):
             ORDER BY path
         """.format(session_id, "%|".join(module_paths))
 
-        module_res = session.execute(module_query).fetchall()
+        module_res = sql_session.execute(module_query).fetchall()
 
         def nodes(paths):
             global use_nodes, s_paths
@@ -464,7 +493,7 @@ class _StatusHelper(object):
         filtered_module_paths = nodes(tuple(module_res))
 
         child_node = orm.aliased(model.Risk)
-        risks = session.query(
+        risks = sql_session.query(
             model.Module,
             model.Risk
         ).filter(
@@ -482,9 +511,11 @@ class _StatusHelper(object):
                 model.Risk,
                 sql.and_(
                     model.Risk.path.startswith(model.Module.path),
-                    model.Risk.session == self.session
+                    model.Risk.session_id == session_id
                 )
             )
+        ).order_by(
+            model.Risk.path
         )
 
         def _module_path(path):
