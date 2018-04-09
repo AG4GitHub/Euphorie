@@ -302,10 +302,13 @@ class ActionPlanTimelineTests(EuphorieTestCase):
     def test_create_workbook_empty_session(self):
         # If there are no risks only the header row should be generated.
         from euphorie.client.tests.utils import testRequest
+        from euphorie.client.utils import setRequest
         request = testRequest()
         request.survey = None
+        setRequest(request)
         view = self.ActionPlanTimeline(None, request)
         view.get_measures = lambda: []
+        view.getModulePaths = lambda: []
         book = view.create_workbook()
         self.assertEqual(len(book.worksheets), 1)
         sheet = book.worksheets[0]
@@ -370,9 +373,11 @@ class ActionPlanTimelineTests(EuphorieTestCase):
         import datetime
         import mock
         from euphorie.client.tests.utils import testRequest
+        from euphorie.client.utils import setRequest
         from euphorie.client import model
         module = model.Module(
             zodb_path='1',
+            path='001',
             title=u'Top-level Module title',
         )
         risk = model.Risk(
@@ -388,12 +393,16 @@ class ActionPlanTimelineTests(EuphorieTestCase):
             budget=500)
         request = testRequest()
         request.survey = mock.Mock()
+        request.survey.ProfileQuestions = lambda: []
         zodb_node = mock.Mock()
         zodb_node.title = u'Risk title.'
         zodb_node.problem_description = u'  '
         request.survey.restrictedTraverse.return_value = zodb_node
+        setRequest(request)
         view = self.ActionPlanTimeline(None, request)
-        view.get_measures = lambda: [(module, risk, plan)]
+        view.getRisks = lambda x: [(module, risk, module.path)]
+        # view.get_measures = lambda: [(module, risk, plan)]
+        view.getModulePaths = lambda: ['1']
         sheet = view.create_workbook().worksheets[0]
         self.assertEqual(sheet.cell('J2').value, u'Risk title')
 

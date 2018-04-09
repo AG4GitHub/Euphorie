@@ -28,6 +28,7 @@ from five import grok
 from lxml import etree
 from openpyxl.workbook import Workbook
 from openpyxl.writer.excel import save_virtual_workbook
+from plone.memoize.instance import memoize
 from plonetheme.nuplone.utils import formatDate
 from rtfng.document.base import RawCode
 from rtfng.document.character import TEXT
@@ -1159,28 +1160,26 @@ class ActionPlanTimeline(grok.View, survey._StatusHelper):
             sheet.cell(row=0, column=column).value = t(title)
 
         row = 1
-
-        modules = self.getModules()
-        risks = self.getRisks([m['path'] for m in modules.values()])
-        import pdb; pdb.set_trace( )
-        for risk in risks:
+        module_paths = self.getModulePaths()
+        filtered_risks = self.getRisks(module_paths)
+        # XXX we are stil missing the measures
+        for (module, risk, module_path) in filtered_risks:
         # for (module, risk, measure) in self.get_measures():
-            if risk.get('identification') in ["n/a", "yes"]:
+            if risk.identification in ["n/a", "yes"]:
                 continue
 
             column = 0
-            if risk.get('is_custom_risk'):
+            if risk.is_custom_risk:
                 zodb_node = None
             else:
-                zodb_node = survey.restrictedTraverse(risk.get('zodb_path').split('/'))
+                zodb_node = survey.restrictedTraverse(risk.zodb_path.split('/'))
             for (ntype, key, title) in self.columns:
                 value = None
                 if ntype == 'measure':
                     pass
                     # value = getattr(measure, key, None)
                 elif ntype == 'risk':
-                    # value = getattr(risk, key, None)
-                    value = risk.get(key, None)
+                    value = getattr(risk, key, None)
                     if key == 'priority':
                         value = self.priority_name(value)
                     elif key == 'title':
@@ -1189,10 +1188,10 @@ class ActionPlanTimeline(grok.View, survey._StatusHelper):
                             value = zodb_node.problem_description
                 elif ntype == 'module':
                     if key == 'title':
-                        if risk.get('is_custom_risk'):
+                        if risk.is_custom_risk:
                             value = utils.get_translated_custom_risks_title(self.request)
                         else:
-                            value = risk.get('module_title')
+                            value = module.title
                 if value is not None:
                     sheet.cell(row=row, column=column).value = value
                 column += 1
