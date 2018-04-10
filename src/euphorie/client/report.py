@@ -28,7 +28,6 @@ from five import grok
 from lxml import etree
 from openpyxl.workbook import Workbook
 from openpyxl.writer.excel import save_virtual_workbook
-from plone.memoize.instance import memoize
 from plonetheme.nuplone.utils import formatDate
 from rtfng.document.base import RawCode
 from rtfng.document.character import TEXT
@@ -1078,7 +1077,9 @@ class ActionPlanTimeline(grok.View, survey._StatusHelper):
         self.session = SessionManager.session
 
     def get_measures(self):
-        """Find all data that should be included in the report.
+        """ XXX Deprecated
+
+            Find all data that should be included in the report.
 
         The data is returned as a list of tuples containing a
         :py:class:`Module <euphorie.client.model.Module>`,
@@ -1141,6 +1142,52 @@ class ActionPlanTimeline(grok.View, survey._StatusHelper):
             _('report_timeline_comment', default=u'Comments')),
     ]
 
+    def getMeasures(self, risk_data):
+        """For the given tuples of (module, risk),
+           find, the given measures and return the combined data.
+
+        The data is returned as a list of tuples containing a
+        :py:class:`Module <euphorie.client.model.Module>`,
+        :py:class:`Risk <euphorie.client.model.Risk>` and
+        :py:class:`ActionPlan <euphorie.client.model.ActionPlan>`. Each
+        entry in the list will correspond to a row in the generated Excel
+        file.
+        """
+        measure_data = []
+        for (module, risk) in risk_data:
+            action_plan_q = self.sql_session.query(
+                model.ActionPlan
+            ).filter(
+                model.ActionPlan.risk_id == risk.id
+            )
+            # If the risk contains no action plan, add it as a single line
+            # to the results
+            action_plans = action_plan_q.all() or [None]
+            for action_plan in action_plans:
+                measure_data.append((module, risk, action_plan))
+
+        # sort by 1. planning start, 2. path
+        # Since we want to sort by date, and we can have None values (that
+        # should be sorted to the end), we need our own compare function
+        def cmp_dates(x, y):
+            a = getattr(x[2], 'planning_start', None)
+            b = getattr(y[2], 'planning_start', None)
+            if a is None:
+                if b is None:
+                    return 0
+                return 1
+            elif b is None:
+                return -1
+            else:
+                if a > b:
+                    return 1
+                elif a < b:
+                    return -1
+                return 0
+
+        by_path_measure_data = sorted(measure_data, key=lambda x: x[1].path)
+        return sorted(by_path_measure_data, cmp=cmp_dates)
+
     def priority_name(self, priority):
         title = self.priority_names.get(priority)
         if title is not None:
@@ -1162,9 +1209,8 @@ class ActionPlanTimeline(grok.View, survey._StatusHelper):
         row = 1
         module_paths = self.getModulePaths()
         filtered_risks = self.getRisks(module_paths)
-        # XXX we are stil missing the measures
-        for (module, risk, module_path) in filtered_risks:
-        # for (module, risk, measure) in self.get_measures():
+        measure_data = self.getMeasures(filtered_risks)
+        for (module, risk, measure) in measure_data:
             if risk.identification in ["n/a", "yes"]:
                 continue
 
@@ -1176,8 +1222,7 @@ class ActionPlanTimeline(grok.View, survey._StatusHelper):
             for (ntype, key, title) in self.columns:
                 value = None
                 if ntype == 'measure':
-                    pass
-                    # value = getattr(measure, key, None)
+                    value = getattr(measure, key, None)
                 elif ntype == 'risk':
                     value = getattr(risk, key, None)
                     if key == 'priority':

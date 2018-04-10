@@ -37,6 +37,8 @@ from euphorie.content.survey import ISurvey
 from five import grok
 from plone.memoize.instance import memoize
 from plonetheme.nuplone.tiles.analytics import trigger_extra_pageview
+from sqlalchemy import case
+from sqlalchemy import func
 from sqlalchemy import orm
 from sqlalchemy import sql
 from z3c.appconfig.interfaces import IAppConfig
@@ -284,31 +286,50 @@ class _StatusHelper(object):
     def sql_session(self):
         return Session()
 
-    @property
-    @memoize
-    def session_id(self):
-        return SessionManager.id
-
     def module_query(self, sessionid, optional_modules):
         if optional_modules:
-            omc = """WHEN profile_index != -1 AND zodb_path IN %(modules)s
-                        THEN SUBSTRING(path FROM 1 FOR 6)
-                    WHEN profile_index = -1 AND zodb_path IN %(modules)s
-                        THEN SUBSTRING(path FROM 1 FOR 3) || '000-profile'
-            """ % dict(modules=optional_modules)
+            case_clause = case(
+                [
+                    (
+                        sql.and_(
+                            model.SurveyTreeItem.profile_index != -1,
+                            model.SurveyTreeItem.zodb_path.in_(optional_modules)
+                        ), func.substr(model.SurveyTreeItem.path, 1, 6)
+                    ),
+                    (
+                        sql.and_(
+                            model.SurveyTreeItem.profile_index == -1,
+                            model.SurveyTreeItem.zodb_path.in_(optional_modules)
+                        ), func.substr(model.SurveyTreeItem.path, 1, 3) + '000-profile'
+                    ),
+                    (
+                        sql.and_(
+                            model.SurveyTreeItem.profile_index != -1,
+                            model.SurveyTreeItem.depth < 2
+                        ), func.substr(model.SurveyTreeItem.path, 1, 3)
+                    ),
+                ]
+            )
         else:
-            omc = ""
-        query = """
-            SELECT
-                CASE %(OPTIONAL_MODULE_CLAUSE)s
-                    WHEN profile_index != -1 AND depth < 2
-                    THEN SUBSTRING(path FROM 1 FOR 3)
-                END AS module
-            FROM tree
-            WHERE session_id=%(sessionid)d AND type='module'
-            GROUP BY module
-            ORDER BY module
-        """ % dict(OPTIONAL_MODULE_CLAUSE=omc, sessionid=sessionid)
+            case_clause = case(
+                [
+                    (
+                        sql.and_(
+                            model.SurveyTreeItem.profile_index != -1,
+                            model.SurveyTreeItem.depth < 2
+                        ), func.substr(model.SurveyTreeItem.path, 1, 3)
+                    ),
+                ]
+            )
+
+        query = self.sql_session.query(
+            case_clause.label('module')
+        ).filter(
+            sql.and_(
+                model.SurveyTreeItem.session_id == sessionid,
+                model.SurveyTreeItem.type == 'module'
+            )
+        ).group_by('module').order_by('module')
         return query
 
     def slicePath(self, path):
@@ -319,28 +340,25 @@ class _StatusHelper(object):
     def getModulePaths(self):
         """ Return a list of all the top-level modules belonging to this survey.
         """
-        sql_session = self.sql_session
-        session_id = self.session_id
+        session_id = self.session.id
         if not session_id:
             return []
         profile = extractProfile(self.request.survey, SessionManager.session)
         module_query = self.module_query(
             sessionid=session_id,
-            optional_modules=len(profile) and "(%s)" % (','.join(
-                ["'%s'" % k for k in profile.keys()])) or None
+            optional_modules=profile.keys()
         )
-        module_res = sql_session.execute(module_query).fetchall()
+        module_res = module_query.all()
         modules_and_profiles = {}
         for row in module_res:
-            if row[0] is not None:
-                if row[0].find('profile') > 0:
-                    path = row[0][:3]
+            if row.module is not None:
+                if row.module.find('profile') > 0:
+                    path = row.module[:3]
                     modules_and_profiles[path] = 'profile'
                 else:
                     modules_and_profiles[row[0]] = ''
         module_paths = [
-            p[0] for p in sql_session.execute(module_query).fetchall() if
-            p[0] is not None]
+            m.module for m in module_res if m.module is not None]
         module_paths = modules_and_profiles.keys()
         module_paths = sorted(module_paths)
         self.modules_and_profiles = modules_and_profiles
@@ -351,7 +369,7 @@ class _StatusHelper(object):
             belonging to this survey.
         """
         sql_session = self.sql_session
-        session_id = self.session_id
+        session_id = self.session.id
         module_paths = self.getModulePaths()
         base_url = "%s/identification" % self.request.survey.absolute_url()
         parent_node = orm.aliased(model.Module)
@@ -438,49 +456,55 @@ class _StatusHelper(object):
         if not len(module_paths):
             return []
         sql_session = self.sql_session
-        session_id = self.session_id
+        session_id = self.session.id
         # First, we need to compute the actual module paths, making sure that
         # skipped optional modules are excluded
         # This means top-level module paths like 001 or 001002 can be replaced
         # by several sub-modules paths like 001002, 001003 and 001002001
-        module_query = """
-        SELECT path, skip_children
-        FROM tree
-        WHERE
-            session_id={0}
-            AND type='module'
-            and tree.path similar to '({1}%)'
-            ORDER BY path
-        """.format(session_id, "%|".join(module_paths))
+        path_clause = [
+            model.SurveyTreeItem.path.like('{}%'.format(mp))
+            for mp in module_paths
+        ]
 
-        module_res = sql_session.execute(module_query).fetchall()
+        module_query = sql_session.query(
+            model.SurveyTreeItem
+        ).filter(
+            sql.and_(
+                model.SurveyTreeItem.session_id == session_id,
+                model.SurveyTreeItem.type == 'module',
+                sql.or_(*path_clause)
+            )
+        ).order_by(model.SurveyTreeItem.path)
 
-        def nodes(paths):
+        module_res = module_query.all()
+        modules_by_path = {m.path: m for m in module_res}
+
+        def nodes(modules):
             global use_nodes, s_paths
             use_nodes = []
-            s_paths = sorted(paths, key=lambda x: x[0])
+            s_paths = sorted(modules, key=lambda x: x.path)
             # In case of repeatable profile questions, the top-level module
             # path will be 6 digits long.
             top_nodes = [
                 elem for elem in s_paths if (
-                    len(elem[0]) == 3 or
-                    (len(elem[0]) == 6 and elem[0][:3] not in s_paths)) and
-                not elem[1]]
+                    len(elem.path) == 3 or
+                    (len(elem.path) == 6 and elem.path[:3] not in s_paths)) and
+                not elem.skip_children]
 
             def use_node(elem):
                 # Recursively find the nodes that are not disabled
                 global use_nodes
                 # Skip this elem?
-                if elem[1]:
+                if elem.skip_children:
                     return
                 children = [
-                    x for x in s_paths if x[0].startswith(elem[0]) and
-                    len(x[0]) == len(elem[0]) + 3]
+                    x for x in s_paths if x.path.startswith(elem.path) and
+                    len(x.path) == len(elem.path) + 3]
                 if children:
                     for child in children:
                         use_node(child)
                 else:
-                    use_nodes.append(elem[0])
+                    use_nodes.append(elem.path)
 
             for elem in top_nodes:
                 use_node(elem)
@@ -533,23 +557,13 @@ class _StatusHelper(object):
         filtered_risks = []
         for (module, risk) in risks.all():
             if risk.identification != 'n/a':
+                module_path = _module_path(module.path)
+                # And, since we might have truncated the path to represent
+                # the top-level module, we also need to get the corresponding
+                # module object.
+                module = modules_by_path[module_path]
                 filtered_risks.append(
-                    (module, risk, _module_path(module.path)))
-                # filtered_risks.append({
-                #     'module_path': _module_path(module.path),
-                #     'module_title': module.title,
-                #     'id': risk.id,
-                #     'path': risk.path,
-                #     'title': risk.title,
-                #     'identification': risk.identification,
-                #     'priority': risk.priority,
-                #     'risk_type': risk.risk_type,
-                #     'zodb_path': risk.zodb_path,
-                #     'is_custom_risk': risk.is_custom_risk,
-                #     'postponed': risk.postponed,
-                #     'number': risk.number,
-                #     'comment': risk.comment,
-                # })
+                    (module, risk))
         return filtered_risks
 
 
@@ -596,14 +610,14 @@ class Status(grok.View, _StatusHelper):
         )
         self.label_page = translate(_(u"label_page", default=u"Page"), target_language=lang)
         self.label_page_of = translate(_(u"label_page_of", default=u"of"), target_language=lang)
-        session = SessionManager.session
+        self.session = SessionManager.session
         if (
-            session is not None and session.title != (
+            self.session is not None and self.session.title != (
                 callable(getattr(self.context, 'Title', None)) and
                 self.context.Title() or ''
             )
         ):
-            self.session_title = session.title
+            self.session_title = self.session.title
         else:
             self.session_title = None
 
@@ -617,7 +631,8 @@ class Status(grok.View, _StatusHelper):
         total_with_measures = 0
         modules = self.getModules()
         filtered_risks = self.getRisks([m['path'] for m in modules.values()])
-        for (module, risk, module_path) in filtered_risks:
+        for (module, risk) in filtered_risks:
+            module_path = module.path
             has_measures = False
             if risk.identification in ['yes', 'n/a']:
                 total_ok += 1
